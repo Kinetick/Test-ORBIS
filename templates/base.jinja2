@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="styleshhet" href="{{ url('static', filename='static.css') }}">
+    {% block title %}
+        <title>{{ page_name }}</title>
+    {% endblock title %}
+    
+</head>
+<body>
+    <nav>
+        <div>
+            <a href="{{ url('index') }}">Index</a>
+        </div>
+        <div>
+            <a href="{{ url('g_info') }}">Info</a>
+        </div>
+        <div>
+            <a href="{{ url('g_insert') }}">Insert</a>
+        </div>
+        <div>
+            <a href="{{ url('g_update') }}">Update</a>
+        </div>
+        <div>
+            <a href="{{ url('g_delete') }}">Delete</a>
+        </div>
+        <div>
+            <a href="{{ url('g_download') }}">Download</a>
+        </div>
+        <div>
+            <a href="{{ url('g_search') }}">Search</a>
+        </div>
+    </nav>
+    <div class="content_wrap">{% block content %}{% endblock content %}</div>
+</body>
+</html>

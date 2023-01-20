@@ -1,0 +1,16 @@
+{% extends "./base.jinja2" %}
+{% block content %}
+    {% if error %}
+        <p>{{ error }}</p>
+    {% endif %}
+    {% if  target != 'index'%}
+        {% include "./form.jinja2" %}
+    {% endif %} 
+    {% if result %}
+        <ul>
+            {% for item in result %}
+                <li>{{ item }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock content %}
