@@ -79,11 +79,11 @@ class FormHandler:
         if not field:
             raise RequiredFormFieldError
     
-    def path_constructor(self, form_data: Dict[str, str]):
-        file_name = '.'.join(
-            (self._form_data['name'].lstrip('/'), self._form_data['ext'].lstrip('./\\'))
-            )
-        return Path(self._form_data['path'].lstrip('./')).joinpath(file_name)
+    @staticmethod
+    def path_constructor(path:str, name: str, ext: str) -> Type[Path]:
+        file_name = '.'.join((name.lstrip('/'), ext.lstrip('./\\')))
+
+        return Path(path.lstrip('./')).joinpath(file_name)
     
     async def handle_form(self, encoding: str='utf-8') -> Coroutine[Any, Any, Dict[str, Union[str, int]]]:
         self._form_data: Dict[str, Union[str, int]] = dict()
@@ -119,7 +119,7 @@ class InsertFormHandler(FormHandler):
                     self._field_validator(self._form_data[field.name])
                 
                 else:
-                    full_path = self.__save_dir.joinpath(self.path_constructor(self._form_data))
+                    full_path = self.__save_dir.joinpath(self.path_constructor(self._form_data['path'], self._form_data['name'], self._form_data['ext']))
                     file_handler = FileHandler(full_path, self.__chunk_size)
         
                     self._form_data['sz'] = await file_handler.file_uploader(field)

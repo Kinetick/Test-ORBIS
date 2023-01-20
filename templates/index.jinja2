@@ -1,4 +1,5 @@
 {% extends "./base.jinja2" %}
+{% from './_result.jinja2' import result_item with context %}
 {% block content %}
     {% if error %}
         <p>{{ error }}</p>
@@ -7,10 +8,8 @@
         {% include "./form.jinja2" %}
     {% endif %} 
     {% if result %}
-        <ul>
-            {% for item in result %}
-                <li>{{ item }}</li>
-            {% endfor %}
-        </ul>
+        {% for item in result %}
+            {{ result_item(item.value, item.del_url, item.upd_url, item.dwld_url) }}
+        {% endfor %}
     {% endif %}
 {% endblock content %}

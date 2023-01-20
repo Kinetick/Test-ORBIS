@@ -29,8 +29,13 @@ async def info(request: Request) -> Response:
             raise HTTPFound(request.app.router['g_info'].url_for().with_query({'error': 'Поля формы обязательны к заполнению!'}))
 
         else:
-            result = await request.app['DB_HANDLER'].select(File, **form_data)
-            context['result'] = result
+            results = await request.app['DB_HANDLER'].select(File, **form_data)
+            if results:
+                for item in results:
+                    parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path']}
+                    item.make_url('g_delete', 'g_update', 'download', request.app, parameters)
+            
+            context['result'] = results
             
     response = render_template('index.jinja2', request=request, context=context)
     
@@ -55,8 +60,13 @@ async def search(request: Request) -> Response:
             raise HTTPFound(request.app.router['g_search'].url_for().with_query({'error': 'Поля формы обязательны к заполнению!'}))
 
         else:
-            result = await request.app['DB_HANDLER'].search(File, **form_data)
-            context['result'] = result
+            results = await request.app['DB_HANDLER'].search(File, **form_data)
+            if results:
+                for item in results:
+                    parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path']}
+                    item.make_url('g_delete', 'g_update', 'download', request.app, parameters)
+            
+            context['result'] = results
             
     response = render_template('index.jinja2', request=request, context=context)
     
@@ -77,19 +87,15 @@ async def get_download(request: Request) -> Response:
 
 
 async def download(request: Request) -> Response:
-    reader = await request.multipart()
+    download_path = request.app['SAVE_DIR'].joinpath(
+        tools.FormHandler.path_constructor(request.query.get('path'), request.query.get('name'), request.query.get('ext')))
+    
     try:
-        form_handler =  tools.FormHandler(reader)
-        download_path = request.app['SAVE_DIR'].joinpath(form_handler.path_constructor(await form_handler.handle_form()))
         file_handler = tools.FileHandler(download_path)
         fl = await file_handler.file_downloader()
-        
-        
-    except tools.RequiredFormFieldError:
-        raise HTTPFound(request.app.router['g_download'].url_for().with_query({'error': 'Поля формы обязательны к заполнению!'}))
 
     except FileNotFoundError:
-        raise HTTPFound(request.app.router['g_download'].url_for().with_query({'error': 'Такого файла не существует!'}))
+        raise HTTPFound(request.app.router['index'].url_for().with_query({'error': 'Такого файла не существует!'}))
     
     else:
         return Response(
@@ -171,6 +177,11 @@ async def delete(request: Request) -> Response:
 
 async def index(request: Request) -> Response:
     results = await request.app['DB_HANDLER'].select_all(File)
+    if results:
+        for item in results:
+            parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path']}
+            item.make_url('g_delete', 'g_update', 'download', request.app, parameters)
+            
     context = {
         'result': results,
         'target': 'index'
@@ -193,8 +204,7 @@ def routes_setup(app: Application) -> None:
     app.router.add_get('/search', search, name='g_search')
     app.router.add_post('/search', search, name='p_search')
     
-    app.router.add_get('/get_download', get_download, name='g_download')
-    app.router.add_post('/download', download, name='p_download')
+    app.router.add_get('/download', download, name='download')
     
     app.router.add_get('/update', update, name='g_update')
     app.router.add_post('/update', update, name='p_update')

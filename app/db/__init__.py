@@ -28,6 +28,29 @@ class File(Base):
     def __repr__(self):
         return f'File(name={self.name}, extension={self.ext}, size={self.sz}, path={self.path}, \
     created_at={self.create}, updated_at={self.update})'
+
+
+class Result:
+    __slots__ = 'value', 'del_url', 'upd_url', 'dwld_url'
+    
+    def __init__(self, value: str) -> None:
+        self.value = value
+        self.del_url = None
+        self.upd_url = None
+        self.dwld_url = None
+    
+    def make_url(
+        self, 
+        del_endpoint_name: str, 
+        upd_endpoint_name: str, 
+        dwld_endpoint_name: str,
+        app: Application, 
+        query_params: Dict[str, Any]
+        ) -> None:
+        
+        self.del_url = app.router[del_endpoint_name].url_for().with_query(query_params)
+        self.upd_url = app.router[upd_endpoint_name].url_for().with_query(query_params)
+        self.dwld_url = app.router[dwld_endpoint_name].url_for().with_query(query_params)
     
 
 class DBHandler:
@@ -72,23 +95,23 @@ class DBHandler:
     
         return res
     
-    async def select_all(self, file: File) -> List[Dict[str, Union[str, int]]]:
+    async def select_all(self, file: File) -> List[Result]:
         async with self.get_session() as session:
             result = await session.execute(sql.select(file))
             
-            return [dumps(self.__result_extractor(item)) for item in result.all()]
+            return [Result(self.__result_extractor(item)) for item in result.all()]
     
-    async def select(self, file: File, name: str='', ext: str='', path: str='') -> List[Dict[str, Union[str, int]]]:
+    async def select(self, file: File, name: str='', ext: str='', path: str='') -> List[Result]:
         async with self.get_session() as session:
             result = await session.execute(sql.select(file).where(sql.and_(file.name == name, file.ext == ext, file.path == path)))
             
-            return [dumps(self.__result_extractor(item)) for item in result.all()]
+            return [Result(self.__result_extractor(item)) for item in result.all()]
     
-    async def search(self, file: File, path='') -> List[Dict[str, Union[str, int]]]:
+    async def search(self, file: File, path='') -> List[Result]:
         async with self.get_session() as session:
             result = await session.execute(sql.select(file).where(file.path.like(f'{path}%')))
             
-            return [dumps(self.__result_extractor(item)) for item in result.all()]
+            return [Result(self.__result_extractor(item)) for item in result.all()]
             
     
     async def release(self):
