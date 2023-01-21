@@ -6,10 +6,11 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from contextlib import asynccontextmanager
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from typing import Type, Coroutine, Any, List, Tuple, Dict, Union
+from typing import Coroutine, Any, List, Tuple, Dict, TypeVar
 
 
 Base = declarative_base()
+T = TypeVar('T', bound=Base)
 
 
 class File(Base):
@@ -95,24 +96,41 @@ class DBHandler:
     
         return res
     
-    async def select_all(self, file: File) -> List[Result]:
+    async def select_all(self, db_item_cls: T) -> Coroutine[Any, Any, List[Result]]:
         async with self.get_session() as session:
-            result = await session.execute(sql.select(file))
+            result = await session.execute(sql.select(db_item_cls))
             
             return [Result(self.__result_extractor(item)) for item in result.all()]
     
-    async def select(self, file: File, name: str='', ext: str='', path: str='') -> List[Result]:
+    async def select(self, db_item_cls: T, name: str='', ext: str='', path: str='') -> Coroutine[Any, Any, List[Result]]:
         async with self.get_session() as session:
-            result = await session.execute(sql.select(file).where(sql.and_(file.name == name, file.ext == ext, file.path == path)))
+            result = await session.execute(sql.select(db_item_cls).where(
+                sql.and_(
+                    db_item_cls.name == name, 
+                    db_item_cls.ext == ext, 
+                    db_item_cls.path == path)
+                ))
             
             return [Result(self.__result_extractor(item)) for item in result.all()]
     
-    async def search(self, file: File, path='') -> List[Result]:
+    async def search(self, db_item_cls: T, path: str = '') -> Coroutine[Any, Any, List[Result]]:
         async with self.get_session() as session:
-            result = await session.execute(sql.select(file).where(file.path.like(f'{path}%')))
+            result = await session.execute(sql.select(db_item_cls).where(db_item_cls.path.like(f'{path}%')))
             
             return [Result(self.__result_extractor(item)) for item in result.all()]
+    
+    async def delete(self, db_item_cls: T, name: str='', ext: str='', path: str='') -> Coroutine[Any, Any, None]:
+        async with self.get_session() as session:
+            result = await session.execute(sql.select(db_item_cls).where(
+                sql.and_(
+                    db_item_cls.name == name, 
+                    db_item_cls.ext == ext, 
+                    db_item_cls.path == path)
+                ))
             
+            result = result.first()
+            await session.delete(result[0])
+            await session.commit()
     
     async def release(self):
         await self.__engine.dispose()

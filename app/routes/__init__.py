@@ -1,5 +1,6 @@
 import aiofiles as aiof
 import aiofiles.os as aos
+import asyncio
 import sqlalchemy as sql
 
 from aiohttp.web import Application, Request, Response, HTTPFound, HTTPPermanentRedirect
@@ -33,7 +34,7 @@ async def info(request: Request) -> Response:
             if results:
                 for item in results:
                     parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path']}
-                    item.make_url('g_delete', 'g_update', 'download', request.app, parameters)
+                    item.make_url('delete', 'g_update', 'download', request.app, parameters)
             
             context['result'] = results
             
@@ -64,7 +65,7 @@ async def search(request: Request) -> Response:
             if results:
                 for item in results:
                     parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path']}
-                    item.make_url('g_delete', 'g_update', 'download', request.app, parameters)
+                    item.make_url('delete', 'g_update', 'download', request.app, parameters)
             
             context['result'] = results
             
@@ -73,22 +74,13 @@ async def search(request: Request) -> Response:
     return response
 
 
-async def get_download(request: Request) -> Response:
-    context = {
-        'form_action_url': request.app.router['p_download'].url_for(),
-        'target': 'download',
-        'error': request.query.get('error', None),
-        'result': None
-    }
-            
-    response = render_template('index.jinja2', request=request, context=context)
-    
-    return response
-
-
 async def download(request: Request) -> Response:
-    download_path = request.app['SAVE_DIR'].joinpath(
-        tools.FormHandler.path_constructor(request.query.get('path'), request.query.get('name'), request.query.get('ext')))
+    download_path = tools.FileHandler.path_constructor(
+        request.app['SAVE_DIR'],
+        request.query.get('path'), 
+        request.query.get('name'), 
+        request.query.get('ext')
+        )
     
     try:
         file_handler = tools.FileHandler(download_path)
@@ -105,7 +97,6 @@ async def download(request: Request) -> Response:
 
 
 async def insert(request: Request) -> Response:
-
     if request.method == 'POST':
         reader = await request.multipart()
         try:
@@ -171,8 +162,14 @@ async def update(request: Request) -> Response:
     return response
 
 
-async def delete(request: Request) -> Response:
-    pass
+async def delete(request: Request) -> None:
+    query_params = tools.collector_query_params(request, ['path', 'name', 'ext'], None)
+    delete_path = tools.FileHandler.path_constructor(request.app['SAVE_DIR'], **query_params)
+    file_handler = tools.FileHandler(delete_path)
+    
+    await asyncio.gather(file_handler.file_deleter(), request.app['DB_HANDLER'].delete(File, **query_params))
+    
+    raise HTTPFound(request.app.router['index'].url_for())
 
 
 async def index(request: Request) -> Response:
@@ -180,7 +177,7 @@ async def index(request: Request) -> Response:
     if results:
         for item in results:
             parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path']}
-            item.make_url('g_delete', 'g_update', 'download', request.app, parameters)
+            item.make_url('delete', 'g_update', 'download', request.app, parameters)
             
     context = {
         'result': results,
@@ -209,7 +206,6 @@ def routes_setup(app: Application) -> None:
     app.router.add_get('/update', update, name='g_update')
     app.router.add_post('/update', update, name='p_update')
     
-    app.router.add_get('/delete', delete, name='g_delete')
-    app.router.add_post('/delete', delete, name='p_delete')
+    app.router.add_get('/delete', delete, name='delete')
     
     app.router.add_static('/static', app['STATIC'], name='static')

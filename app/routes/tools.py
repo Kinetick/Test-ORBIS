@@ -3,10 +3,15 @@ import aiofiles.os as aos
 
 from aiohttp import BodyPartReader, MultipartReader
 from aiohttp.web import Request
-from json import dumps
 from pathlib import Path
 from datetime import datetime
-from typing import Any, Coroutine, Dict, Type, Union, List, Tuple
+from time import time
+from typing import Any, Coroutine, Dict, Union, List, TypeVar, Optional
+
+T = TypeVar('T', bound=Path)
+
+def collector_query_params(request: Request, params_names: List[str], default: Any) -> Dict[str, Any]:
+     return {name: request.query.get(name, default) for name in params_names}
 
 
 class RequiredFormFieldError(Exception):
@@ -24,7 +29,7 @@ class RequiredFormFieldError(Exception):
             
 
 class FileHandler:
-    def __init__(self, path: Type[Path], chunk_size: int = 65535) -> None:
+    def __init__(self, path: T, chunk_size: int = 65535) -> None:
         self._path = path
         self._chunk_size = chunk_size  
     
@@ -37,8 +42,7 @@ class FileHandler:
                 raise FileNotFoundError
         
         else:
-            if mkdir:
-                raise FileExistsError
+            raise FileExistsError
     
     async def file_uploader(self, source: BodyPartReader) -> Coroutine[Any, Any, int]:
         await self._is_exist()
@@ -55,17 +59,41 @@ class FileHandler:
     
         return size
     
-    async def file_downloader(self) -> Coroutine[Any, Any, int]:
-        await self._is_exist(False)
+    async def file_downloader(self) -> Coroutine[Any, Any, Optional[bytes]]:
+        try:
+            await self._is_exist(False)
         
-        async with aiof.open(self._path, 'rb') as fd:
-            result = await fd.read()
-            print(result)
+        except FileExistsError:
+            async with aiof.open(self._path, 'rb') as fd:
+                result = await fd.read()
         
-        return result
+            return result
     
-       
-       
+    async def file_deleter(self) -> Coroutine[Any, Any, None]:
+        try:
+            await self._is_exist(False)
+        
+        except FileExistsError:
+            await aos.remove(self._path)
+        
+        # Заглушка, т.к. нету функции нормализации БД (пока примем, как условность, что БД и хранилище синхронизированы)    
+        except FileNotFoundError:
+            pass
+        
+    @staticmethod
+    def path_constructor(save_dir_path: T, path:str = '', name: str = '', ext: str = '') -> T:
+        if all((path, name, ext)):
+            file_name = '.'.join((name.lstrip('/'), ext.lstrip('./\\')))
+            rel_path = Path(path.lstrip('./')).joinpath(file_name)
+        
+        else:
+            rel_path = Path('file_{tm}.bin'.format(tm=int(time() * 1000)))
+        
+        abs_path = save_dir_path.joinpath(rel_path)
+
+        return abs_path
+    
+
 class FormHandler:
     def __init__(self, reader: MultipartReader) -> None:
         self.__reader = reader
@@ -78,12 +106,6 @@ class FormHandler:
     def _field_validator(self, field: Union[str, int]) -> None:
         if not field:
             raise RequiredFormFieldError
-    
-    @staticmethod
-    def path_constructor(path:str, name: str, ext: str) -> Type[Path]:
-        file_name = '.'.join((name.lstrip('/'), ext.lstrip('./\\')))
-
-        return Path(path.lstrip('./')).joinpath(file_name)
     
     async def handle_form(self, encoding: str='utf-8') -> Coroutine[Any, Any, Dict[str, Union[str, int]]]:
         self._form_data: Dict[str, Union[str, int]] = dict()
@@ -100,7 +122,7 @@ class InsertFormHandler(FormHandler):
     def __init__(
         self,
         reader: MultipartReader,
-        save_dir: Type[Path],
+        save_dir: T,
         chunk_size: int = 65535
         ) -> None:
         
@@ -119,7 +141,13 @@ class InsertFormHandler(FormHandler):
                     self._field_validator(self._form_data[field.name])
                 
                 else:
-                    full_path = self.__save_dir.joinpath(self.path_constructor(self._form_data['path'], self._form_data['name'], self._form_data['ext']))
+                    full_path = FileHandler.path_constructor(
+                        self.__save_dir,
+                        self._form_data['path'], 
+                        self._form_data['name'], 
+                        self._form_data['ext']
+                        )
+                    
                     file_handler = FileHandler(full_path, self.__chunk_size)
         
                     self._form_data['sz'] = await file_handler.file_uploader(field)
