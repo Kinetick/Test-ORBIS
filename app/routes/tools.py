@@ -4,9 +4,10 @@ import aiofiles.os as aos
 from aiohttp import BodyPartReader, MultipartReader
 from aiohttp.web import Request
 from pathlib import Path
-from datetime import datetime
 from time import time
 from typing import Any, Coroutine, Dict, Union, List, TypeVar, Optional
+
+from app.db import Result
 
 T = TypeVar('T', bound=Path)
 
@@ -34,11 +35,15 @@ class FileHandler:
         self._chunk_size = chunk_size  
     
     async def _is_exist(self, mkdir: bool = True) -> Coroutine[Any, Any, bool]:
-        if not await aos.path.exists(self._path):
-            if not await aos.path.exists(self._path.parent) and mkdir:
+        file_existance = await aos.path.exists(self._path)
+        
+        if not file_existance:
+            file_dir_existance = await aos.path.exists(self._path.parent)
+            
+            if not file_dir_existance and mkdir:
                 await aos.makedirs(self._path.parent, exist_ok=True)
 
-            else:
+            if (not file_dir_existance or file_dir_existance) and not mkdir:
                 raise FileNotFoundError
         
         else:
@@ -92,7 +97,7 @@ class FileHandler:
         abs_path = save_dir_path.joinpath(rel_path)
 
         return abs_path
-    
+
 
 class FormHandler:
     def __init__(self, reader: MultipartReader) -> None:
@@ -107,51 +112,51 @@ class FormHandler:
         if not field:
             raise RequiredFormFieldError
     
-    async def handle_form(self, encoding: str='utf-8') -> Coroutine[Any, Any, Dict[str, Union[str, int]]]:
+    async def parse_data(self, encoding: str='utf-8') -> Coroutine[Any, Any, Dict[str, Union[str, int]]]:
         self._form_data: Dict[str, Union[str, int]] = dict()
         
-        async for field in self.__reader:
-            if field.name != 'submit':
-                self._form_data[field.name] = await self._field_decoder(field, encoding)
-                self._field_validator(self._form_data[field.name])
-        
-        return self._form_data
-               
+        field = None
+        async for f in self.__reader:
+            if f.name != 'submit':
+                if f.name != 'file_choose':
+                    self._form_data[f.name] = await self._field_decoder(f, encoding)
+                    self._field_validator(self._form_data[f.name])
+            
+                else:
+                    field = f
+                    break
 
-class InsertFormHandler(FormHandler):
+        return self._form_data, field
+
+class PageContext:
+    __slots__ = 'target', 'form_action_name', 'form_data', 'result', 'page_name', 'request'
+    
     def __init__(
         self,
-        reader: MultipartReader,
-        save_dir: T,
-        chunk_size: int = 65535
+        request: Request, 
+        target: str, 
+        page_name: str,
+        form_action_name: Optional[str] = None,
+        form_data: Optional[Any] = None,
+        result: Optional[List[Result]] = None
+        
         ) -> None:
         
-        super().__init__(reader)
-        self.__reader = reader
-        self.__save_dir = save_dir
-        self.__chunk_size = chunk_size
+        self.target = target
+        self.page_name = page_name
+        self.request = request
+        self.form_action_name = form_action_name    
+        self.form_data = form_data
+        self.result = result
     
-    async def handle_form(self, encoding: str='utf-8') -> Coroutine[Any, Any, Dict[str, Union[str, int]]]:
-        self._form_data: Dict[str, Union[str, int]] = dict()
+    def get_context(self) -> Dict[str, Any]:
+        c = {
+            'target': self.target,
+            'error': self.request.query.get('error', None),
+            'f_action': self.request.app.router[self.form_action_name].url_for() if self.form_action_name else self.form_action_name,
+            'f_data': self.form_data,
+            'page_name': self.page_name,
+            'result': self.result
+        }
         
-        async for field in self.__reader: 
-            if field.name != 'submit':
-                if field.name != 'file_choose':
-                    self._form_data[field.name] = await self._field_decoder(field, encoding)
-                    self._field_validator(self._form_data[field.name])
-                
-                else:
-                    full_path = FileHandler.path_constructor(
-                        self.__save_dir,
-                        self._form_data['path'], 
-                        self._form_data['name'], 
-                        self._form_data['ext']
-                        )
-                    
-                    file_handler = FileHandler(full_path, self.__chunk_size)
-        
-                    self._form_data['sz'] = await file_handler.file_uploader(field)
-                    self._form_data['create'] = datetime.now().isoformat()
-                    self._form_data['update'] = None
-        
-        return self._form_data
+        return c
