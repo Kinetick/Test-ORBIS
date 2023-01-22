@@ -1,4 +1,4 @@
-{%- macro m_form_row(name, id, classes, placeholder="None", label="None", type="text", value ="None") %}
+{%- macro form_row(name, id, classes, placeholder="None", label="None", type="text", value ="None") %}
     <div class="{{ classes }}">
     {%- if not type == "submit" %}
         <label for="{{ id }}">{{ label|capitalize|e if label != "None" else type|capitalize|e}}</label>
@@ -7,49 +7,29 @@
     </div>
 {% endmacro -%}
 
-{# {%- macro m_form(action_url={{ f.url }}, method='post', enctype='multipart/form-data', class='form', charset='utf-8', target={{ f.target }}) %}
-    <form action="{{ action_url }}" method="{{ method }}" enctype="{{ enctype }}" class="{{ class }}" accept-charset="{{ charset }}">
-        {%- if  target != 'search'%}
-            {{ form_row("name", "f_name", "text_row", label="Имя файла:", placeholder="Пример: myfile") }}
+{%- macro m_form(action_url,  page_target, form_data) %}
+    <form action="{{ action_url }}" method="post" enctype="multipart/form-data" class="form_style" accept-charset="utf-8">
+        {%- if  page_target != 'search'%}
+            <div class="text_row">
+                <label for="f_name">Имя файла:</label>
+                <input id="f_name" class="text_row" name="name" placeholder="Пример: myfile" value="{{ form_data.name }}">
+            </div>  
         {% endif -%}
-    
-        {%- if target != 'search' and target != 'update' %}
+        {%- if page_target != 'search' and page_target != 'update' %}
             {{ form_row("ext", "f_ext", "text_row", label="Расширение файла:", placeholder="Пример: txt, mp3") }}
         {% endif -%}
-    
-        {{ form_row("path", "f_path", "text_row", label="Абсолютный путь:", placeholder="Пример: /my_dir") }}
-    
-        {%- if  target == 'insert' or target == 'update' %}
-            <textarea name="comment" id="f_comm" rows="2" cols="100" name="comment" placeholder="Комментарий:"></textarea>
+        <div class="text_row">
+            <label for="f_path">Путь к файлу:</label>
+            <input id="f_path" class="text_row" name="path", placeholder="Пример: /my_dir" value="{{ form_data.path }}">
+        </div>
+        {%- if  page_target == 'insert' or page_target == 'update' %}
+            <textarea name="comment" id="f_comm" rows="2" cols="100" name="comment" placeholder="Комментарий:">{{ form_data.comment }}</textarea>
         {% endif -%}
     
-        {%- if target == 'insert'%}
+        {%- if page_target == 'insert'%}
             {{ form_row("file_choose", "f_file", "file_row", label="Выбрать файл:", type="file") }}
         {% endif -%}
     
         {{ form_row("submit", "rid_3", "submit_row", type="submit", value="Отправить") }}
     </form>
-{% endmacro -%} #}
-
-
-<form action="{{ form_action_url }}" method="post" enctype="multipart/form-data" class="form_style" accept-charset="utf-8">
-    {% if  target != 'search'%}
-        {{ m_form_row("name", "f_name", "text_row", label="Имя файла:", placeholder="Пример: myfile") }}
-    {% endif %}
-    
-    {%- if target != 'search' and target != 'update' %}
-        {{ m_form_row("ext", "f_ext", "text_row", label="Расширение файла:", placeholder="Пример: txt, mp3") }}
-    {% endif -%}
-    
-    {{ m_form_row("path", "f_path", "text_row", label="Абсолютный путь:", placeholder="Пример: /my_dir") }}
-    
-    {%- if  target == 'insert' or target == 'update' %}
-        <textarea name="comment" id="f_comm" rows="2" cols="100" name="comment" placeholder="Комментарий:"></textarea>
-    {% endif -%}
-    
-    {%- if target == 'insert'%}
-        {{ m_form_row("file_choose", "f_file", "file_row", label="Выбрать файл:", type="file") }}
-    {% endif -%}
-    
-    {{ m_form_row("submit", "rid_3", "submit_row", type="submit", value="Отправить") }}
-</form>
+{% endmacro -%}

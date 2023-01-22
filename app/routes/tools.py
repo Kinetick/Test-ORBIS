@@ -6,6 +6,7 @@ from aiohttp.web import Request
 from pathlib import Path
 from time import time
 from typing import Any, Coroutine, Dict, Union, List, TypeVar, Optional
+from yarl import URL
 
 from app.db import Result
 
@@ -80,6 +81,12 @@ class FileHandler:
         
         except FileExistsError:
             await aos.remove(self._path)
+            
+            try:
+                await aos.removedirs(self._path.parent)
+            
+            except OSError:
+                pass
         
         # Заглушка, т.к. нету функции нормализации БД (пока примем, как условность, что БД и хранилище синхронизированы)    
         except FileNotFoundError:
@@ -116,7 +123,7 @@ class FormHandler:
         self._form_data: Dict[str, Union[str, int]] = dict()
         
         field = None
-        async for f in self.__reader:
+        async for f in self.__reader:  
             if f.name != 'submit':
                 if f.name != 'file_choose':
                     self._form_data[f.name] = await self._field_decoder(f, encoding)
@@ -129,14 +136,14 @@ class FormHandler:
         return self._form_data, field
 
 class PageContext:
-    __slots__ = 'target', 'form_action_name', 'form_data', 'result', 'page_name', 'request'
+    __slots__ = 'target', 'form_action', 'form_data', 'result', 'page_name', 'request'
     
     def __init__(
         self,
         request: Request, 
         target: str, 
         page_name: str,
-        form_action_name: Optional[str] = None,
+        form_action: Optional[URL] = None,
         form_data: Optional[Any] = None,
         result: Optional[List[Result]] = None
         
@@ -145,7 +152,7 @@ class PageContext:
         self.target = target
         self.page_name = page_name
         self.request = request
-        self.form_action_name = form_action_name    
+        self.form_action = form_action  
         self.form_data = form_data
         self.result = result
     
@@ -153,7 +160,7 @@ class PageContext:
         c = {
             'target': self.target,
             'error': self.request.query.get('error', None),
-            'f_action': self.request.app.router[self.form_action_name].url_for() if self.form_action_name else self.form_action_name,
+            'f_action': self.form_action,
             'f_data': self.form_data,
             'page_name': self.page_name,
             'result': self.result

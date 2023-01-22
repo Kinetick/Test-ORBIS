@@ -1,11 +1,12 @@
 {% extends "./base.jinja2" %}
 {% from './_result.jinja2' import result_item with context %}
+{% from './form.jinja2' import m_form %}
 {% block content %}
     {% if error %}
         <p>{{ error }}</p>
     {% endif %}
-    {% if  target != 'index'%}
-        {% include "./form.jinja2" %}
+    {% if  target != 'index' %}
+        {{ m_form(f_action, target, f_data) }}
     {% endif %} 
     {% if result %}
         {% for item in result %}

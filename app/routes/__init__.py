@@ -13,7 +13,8 @@ import app.routes.forms as forms
 from app.db import File
 
 async def info(request: Request) -> Response:
-    context = tools.PageContext(request, 'info', 'Info', 'p_info')
+    f_action = request.app.router['p_info'].url_for()
+    context = tools.PageContext(request, 'info', 'Info', f_action)
     
     if request.method == 'POST':
         reader = await request.multipart()
@@ -29,7 +30,7 @@ async def info(request: Request) -> Response:
             results = await request.app['DB_HANDLER'].select(File, **form.get_data())
             if results:
                 for item in results:
-                    parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path']}
+                    parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path'], 'comment': item.value['comment']}
                     item.make_url('delete', 'g_update', 'download', request.app, parameters)
             
             context.result = results
@@ -40,25 +41,28 @@ async def info(request: Request) -> Response:
 
 
 async def search(request: Request) -> Response:
-    context = tools.PageContext(request, 'search', 'Search', 'p_search')
+    f_action = request.app.router['p_search'].url_for()
+    context = tools.PageContext(request, 'search', 'Search', f_action)
     
     if request.method == 'POST':
         reader = await request.multipart()
+        fabric = forms.FormDataFabric(forms.SearchForm, tools.FormHandler, reader)
+        
         try:
-            form_handler =  tools.FormHandler(reader)
-            form_data = await form_handler.parse_data()
+            form, _ = await fabric.create()
         
         except tools.RequiredFormFieldError:
             raise HTTPFound(request.app.router['g_search'].url_for().with_query({'error': 'Поля формы обязательны к заполнению!'}))
 
         else:
-            results = await request.app['DB_HANDLER'].search(File, **form_data)
+            results = await request.app['DB_HANDLER'].search(File, **form.get_data())
             if results:
                 for item in results:
-                    parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path']}
+                    parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path'], 'comment': item.value['comment']}
                     item.make_url('delete', 'g_update', 'download', request.app, parameters)
             
             context.result = results
+            print(context.result)
     
             
     response = render_template('index.jinja2', request=request, context=context.get_context())
@@ -89,11 +93,12 @@ async def download(request: Request) -> Response:
 
 
 async def insert(request: Request) -> Response:
-    context = tools.PageContext(request, 'insert', 'Insert', 'p_insert')
+    f_action = request.app.router['p_insert'].url_for()
+    context = tools.PageContext(request, 'insert', 'Insert', f_action)
     
     if request.method == 'POST':
         reader = await request.multipart()
-        fabric = forms.FormDataFabric(forms.InsertForm, tools.FileHandler, reader)
+        fabric = forms.FormDataFabric(forms.InsertForm, tools.FormHandler, reader)
         
         try:
             form, field = await fabric.create()
@@ -118,39 +123,17 @@ async def insert(request: Request) -> Response:
         
 # Пока не реализовано
 async def update(request: Request) -> Response:
+    f_action = request.app.router['p_update'].url_for().with_query(request.query)
+    context = tools.PageContext(request, 'update', 'Update', f_action)
+    context.form_data =  forms.UpdateForm(**request.query)
+    
     if request.method == 'POST':
         reader = await request.multipart()
-        try:
-            form_handler = tools.InsertFormHandler(reader, request.app['SAVE_DIR'])
-            form_data = await form_handler.parse_data()
-        
-        except tools.RequiredFormFieldError:
-            raise HTTPFound(request.app.router['g_update'].url_for().with_query({'error': 'Поля формы обязательны к заполнению!'}))
-        
-        else:
-            async with request.app['DB_HANDLER'].get_session() as session:
-                result = await session.execute(
-                    sql.select(File).where(
-                        sql.and_(File.name == form_data['name'], File.path == form_data['path'], File.ext == form_data['ext'])))
-                
-                file = result.first()[0]
-                
-                if file:
-                    print(file)
-                    file.name = form_data['new_name']
-                    file.path = form_data['new_path']
-                    file.comment = form_data['new_comment']
-                    file.update = datetime.now().isoformat()
-                
-                    await session.commit()       
+        fabric = forms.FormDataFabric(forms.UpdateForm, tools.FormHandler, reader)
+        form = await fabric.create()
+        print(form.get_data())        
     
-    context = {
-        'form_action_url': request.app.router['p_update'].url_for(),
-        'target': 'update',
-        'error': request.query.get('error', None)
-    }
-    
-    response = render_template('index.jinja2', request=request, context=context)
+    response = render_template('index.jinja2', request=request, context=context.get_context())
     
     return response
 
@@ -170,7 +153,7 @@ async def index(request: Request) -> Response:
     results = await request.app['DB_HANDLER'].select_all(File)
     if results:
         for item in results:
-            parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path']}
+            parameters = {'name': item.value['name'], 'ext': item.value['extension'], 'path': item.value['path'], 'comment': item.value['comment']}
             item.make_url('delete', 'g_update', 'download', request.app, parameters)
             
     context.result = results

@@ -1,5 +1,5 @@
 from aiohttp import BodyPartReader, MultipartReader
-from typing import Any, Coroutine, TypeVar, Dict, Union
+from typing import Any, Coroutine, TypeVar, Dict, Union, Type
 
 from app.routes.tools import FormHandler
 
@@ -32,15 +32,31 @@ class InfoForm(SearchForm):
         }
         
         return r
-        
 
-class InsertForm(InfoForm):
-    __slots__ = 'comment', 'sz', 'create', 'update'
+
+class UpdateForm(InfoForm):
+    __slots__ = 'comment'
     
-    def __init__(self, path: str, name: str, ext: str, comment: str) -> None:
+    def __init__(self, path: str, name: str , comment: str, ext: str) -> None:
         
         super().__init__(path, name, ext)
         self.comment = comment
+    
+    def get_data(self) -> Dict[str, str]:
+        r = {
+            **super().get_data(),
+            **{'comment': self.comment}
+        }
+        
+        return r
+        
+
+class InsertForm(UpdateForm):
+    __slots__ = 'sz', 'create', 'update'
+    
+    def __init__(self, *args, **kwargs) -> None:
+        
+        super().__init__(*args, **kwargs)
         self.sz = None
         self.create = None
         self.update = None
@@ -48,7 +64,7 @@ class InsertForm(InfoForm):
     def get_data(self) -> Dict[str, str]:
         r = {
             **super().get_data(),
-            **{'path': self.path, 'sz': self.sz, 'create': self.create, 'update': self.update},  
+            **{'path': self.path, 'sz': self.sz, 'create': self.create, 'update': self.update, 'comment': self.comment},  
         }
         
         return r
@@ -58,10 +74,10 @@ FT = TypeVar('FT', bound=SearchForm)
 
 
 class FormDataFabric:
-    def __init__(self, form_cls: FT, handler: FormHandler, reader: MultipartReader) -> None:
+    def __init__(self, form_cls: FT, handler: Type[FormHandler], reader: MultipartReader) -> None:
         
         self.__reader = reader
-        self.__handler = FormHandler
+        self.__handler = handler
         self.__form = form_cls
         self.__form_data = None
         self.__field = None

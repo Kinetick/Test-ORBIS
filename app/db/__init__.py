@@ -49,9 +49,11 @@ class Result:
         query_params: Dict[str, Any]
         ) -> None:
         
-        self.del_url = app.router[del_endpoint_name].url_for().with_query(query_params)
+        download_delete_p = {'name': query_params['name'], 'path': query_params['path'], 'ext': query_params['ext']}
+        
+        self.del_url = app.router[del_endpoint_name].url_for().with_query(download_delete_p)
         self.upd_url = app.router[upd_endpoint_name].url_for().with_query(query_params)
-        self.dwld_url = app.router[dwld_endpoint_name].url_for().with_query(query_params)
+        self.dwld_url = app.router[dwld_endpoint_name].url_for().with_query(download_delete_p)
     
 
 class DBHandler:
