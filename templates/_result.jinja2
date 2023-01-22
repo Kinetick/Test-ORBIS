@@ -1,10 +1,12 @@
 {%- macro result_item(value, del_url, upd_url, dwld_url) %}
-    <div class="result">
-        <p class="result_json">{{ value }}</p>
-        <div class="result_nav">
-            <a class="result_link" href="{{ del_url }}">Удалить</a>
-            <a class="result_link" href="{{ upd_url }}">Изменить</a>
-            <a class="result_link" href="{{ dwld_url }}">Загрузить</a>
+<tr>
+    <td>{{ value }}</td>
+    <td>
+        <div class="link-group">
+        <a class="result_link" href="{{ del_url }}">Удалить</a>
+        <a class="result_link" href="{{ upd_url }}">Изменить</a>
+        <a class="result_link" href="{{ dwld_url }}">Загрузить</a>
         </div>
-    </div>
+    </td>
+</tr>
 {% endmacro -%}

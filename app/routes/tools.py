@@ -6,15 +6,16 @@ from aiohttp.web import Request
 from pathlib import Path
 from time import time
 from typing import Any, Coroutine, Dict, Union, List, TypeVar, Optional
+from multidict import MultiDict
 from yarl import URL
 
 from app.db import Result
+from app.routes import exceptipon as exc
 
 T = TypeVar('T', bound=Path)
 
 def collector_query_params(request: Request, params_names: List[str], default: Any) -> Dict[str, Any]:
      return {name: request.query.get(name, default) for name in params_names}
-
 
 class RequiredFormFieldError(Exception):
     def __init__(self, *args: object) -> None:
@@ -28,6 +29,19 @@ class RequiredFormFieldError(Exception):
         
         else:
             return f'Возникло исключение: {self.__class__.__name__}.'
+
+class FileMetaDifference(Exception):
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
+
+        self.__message = args[0] if args else None
+    
+    def __str__(self):
+        if self.__message is not None:
+            return 'Имя или относительный путь файла изменились.'
+        
+        else:
+            return f'Возникло исключение: {self.__class__.__name__}.'
             
 
 class FileHandler:
@@ -35,20 +49,34 @@ class FileHandler:
         self._path = path
         self._chunk_size = chunk_size  
     
-    async def _is_exist(self, mkdir: bool = True) -> Coroutine[Any, Any, bool]:
-        file_existance = await aos.path.exists(self._path)
+    async def _is_exist(self, path: Optional[T]=None, mkdir: bool = True) -> Coroutine[Any, Any, bool]:
+        if path is None:
+            path = self._path
+        file_existance = await aos.path.exists(path)
         
         if not file_existance:
-            file_dir_existance = await aos.path.exists(self._path.parent)
+            file_dir_existance = await aos.path.exists(path.parent)
             
             if not file_dir_existance and mkdir:
-                await aos.makedirs(self._path.parent, exist_ok=True)
+                await aos.makedirs(path.parent, exist_ok=True)
 
             if (not file_dir_existance or file_dir_existance) and not mkdir:
                 raise FileNotFoundError
         
         else:
             raise FileExistsError
+
+    async def _cleaner(self, path: T) -> Coroutine[Any, Any, None]:
+        try:
+            await aos.removedirs(path)
+        
+        except OSError:
+            pass
+    
+    async def file_replacer(self, new_path: T) -> Coroutine[Any, Any, None]:
+        await self._is_exist(new_path, True)
+        await aos.replace(self._path, new_path)
+        await self._cleaner(self._path.parent)
     
     async def file_uploader(self, source: BodyPartReader) -> Coroutine[Any, Any, int]:
         await self._is_exist()
@@ -67,7 +95,7 @@ class FileHandler:
     
     async def file_downloader(self) -> Coroutine[Any, Any, Optional[bytes]]:
         try:
-            await self._is_exist(False)
+            await self._is_exist(mkdir=False)
         
         except FileExistsError:
             async with aiof.open(self._path, 'rb') as fd:
@@ -77,17 +105,12 @@ class FileHandler:
     
     async def file_deleter(self) -> Coroutine[Any, Any, None]:
         try:
-            await self._is_exist(False)
+            await self._is_exist(mkdir=False)
         
         except FileExistsError:
             await aos.remove(self._path)
-            
-            try:
-                await aos.removedirs(self._path.parent)
-            
-            except OSError:
-                pass
-        
+            await self._cleaner(self._path.parent)
+
         # Заглушка, т.к. нету функции нормализации БД (пока примем, как условность, что БД и хранилище синхронизированы)    
         except FileNotFoundError:
             pass
@@ -117,7 +140,7 @@ class FormHandler:
     
     def _field_validator(self, field: Union[str, int]) -> None:
         if not field:
-            raise RequiredFormFieldError
+            raise exc.RequiredFormFieldError
     
     async def parse_data(self, encoding: str='utf-8') -> Coroutine[Any, Any, Dict[str, Union[str, int]]]:
         self._form_data: Dict[str, Union[str, int]] = dict()

@@ -1,5 +1,4 @@
 import asyncio
-
 from aiohttp.web import run_app
 from pathlib import Path
 
@@ -20,6 +19,7 @@ APP_VARS = {
 
 
 async def server() -> None:
+    
     if not APP_VARS['save_dir'].exists():
         APP_VARS['save_dir'].mkdir(parents=True)
 
@@ -30,7 +30,8 @@ async def server() -> None:
 
 if __name__ == '__main__':
     try:
+        print('Server - ON')
         asyncio.run(server())
     
     except KeyboardInterrupt:
-        print('\b\bServer Stop - OK!')
+        print('\b\bServer - OFF')

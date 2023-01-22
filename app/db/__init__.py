@@ -1,12 +1,10 @@
 import sqlalchemy as sql
-
-from aiohttp.web import Application
-from json import dumps
+from aiohttp.web import Application, Request
 from sqlalchemy.orm import declarative_base, sessionmaker
 from contextlib import asynccontextmanager
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from typing import Coroutine, Any, List, Tuple, Dict, TypeVar
+from typing import Coroutine, Any, List, Dict, TypeVar
 
 
 Base = declarative_base()
@@ -17,7 +15,7 @@ class File(Base):
     __tablename__ = 'files'
     
     name = sql.Column('name', sql.String)
-    ext = sql.Column('extension', sql.String(8))
+    ext = sql.Column('extension', sql.String)
     sz = sql.Column('size', sql.Integer, nullable=False)
     path = sql.Column('path', sql.String)
     create = sql.Column('created_at', sql.String, nullable=False)
@@ -58,7 +56,7 @@ class Result:
 
 class DBHandler:
     def __init__(self, db_url: str, echo: bool=False, future: bool=True) -> None:
-        self.__engine = create_async_engine(db_url, echo=echo, future=future)
+        self.__engine = create_async_engine(db_url, echo=True, future=future)
         self.__session_maker = sessionmaker(self.__engine, expire_on_commit=False, class_=AsyncSession)
     
     async def create(self, Base: DeclarativeMeta) -> None:
@@ -79,59 +77,46 @@ class DBHandler:
         finally:
             await session.close()
     
-    async def insert(self, file: File) -> None:
+    async def insert(self, file: File) -> Coroutine[Any, Any, None]:
         async with self.get_session() as session:
             session.add(file)
             await session.commit()
     
     @staticmethod
-    def __result_extractor(result_item: Tuple[File]) -> Dict[str, Any]:
+    def __result_unpacker(result_item: File) -> Dict[str, Any]:
         res = {
-        'name': result_item[0].name,
-        'extension': result_item[0].ext,
-        'size': result_item[0].sz,
-        'path': result_item[0].path,
-        'created_at': result_item[0].create,
-        'updated_at': result_item[0].update,
-        'comment': result_item[0].comment
+        'name': result_item.name,
+        'ext': result_item.ext,
+        'size': result_item.sz,
+        'path': result_item.path,
+        'created_at': result_item.create,
+        'updated_at': result_item.update,
+        'comment': result_item.comment
         }
     
         return res
     
-    async def select_all(self, db_item_cls: T) -> Coroutine[Any, Any, List[Result]]:
+    async def execute(self, sql_query: Any, is_dml: bool = False) -> Coroutine[Any, Any, List[Result]]:
         async with self.get_session() as session:
-            result = await session.execute(sql.select(db_item_cls))
+            if is_dml:
+                await session.execute(sql_query)
+                await session.commit()
             
-            return [Result(self.__result_extractor(item)) for item in result.all()]
-    
-    async def select(self, db_item_cls: T, name: str='', ext: str='', path: str='') -> Coroutine[Any, Any, List[Result]]:
+            else:
+                result = await session.execute(sql_query)
+                return [Result(self.__result_unpacker(item)) for item in result.scalars()]
+            
+    async def update(self, file: File, request: Request, values: Dict[str, Any]) -> Coroutine[Any, Any, None]:
+        sql_query = sql.update(file)\
+            .where(
+                file.name == request.query.get('name'),
+                file.ext == request.query.get('ext'),
+                file.path == request.query.get('path')
+            )\
+            .values(values)
+        
         async with self.get_session() as session:
-            result = await session.execute(sql.select(db_item_cls).where(
-                sql.and_(
-                    db_item_cls.name == name, 
-                    db_item_cls.ext == ext, 
-                    db_item_cls.path == path)
-                ))
-            
-            return [Result(self.__result_extractor(item)) for item in result.all()]
-    
-    async def search(self, db_item_cls: T, path: str = '') -> Coroutine[Any, Any, List[Result]]:
-        async with self.get_session() as session:
-            result = await session.execute(sql.select(db_item_cls).where(db_item_cls.path.like(f'{path}%')))
-            
-            return [Result(self.__result_extractor(item)) for item in result.all()]
-    
-    async def delete(self, db_item_cls: T, name: str='', ext: str='', path: str='') -> Coroutine[Any, Any, None]:
-        async with self.get_session() as session:
-            result = await session.execute(sql.select(db_item_cls).where(
-                sql.and_(
-                    db_item_cls.name == name, 
-                    db_item_cls.ext == ext, 
-                    db_item_cls.path == path)
-                ))
-            
-            result = result.first()
-            await session.delete(result[0])
+            await session.execute(sql_query)
             await session.commit()
     
     async def release(self):

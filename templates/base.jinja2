@@ -4,27 +4,29 @@
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="styleshhet" href="{{ url('static', filename='static.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url('static', filename='styles.css') }}">
     {% block title %}
         <title>{{ page_name }}</title>
     {% endblock title %}
     
 </head>
 <body>
+<main>
     <nav>
-        <div>
+        <div class="button-nav">
             <a href="{{ url('index') }}">Главная</a>
         </div>
-        <div>
+        <div class="button-nav">
             <a href="{{ url('g_info') }}">Информация о файле</a>
         </div>
-        <div>
+        <div class="button-nav">
             <a href="{{ url('g_insert') }}">Вставить</a>
         </div>
-        <div>
+        <div class="button-nav">
             <a href="{{ url('g_search') }}">Поиск</a>
         </div>
     </nav>
     <div class="content_wrap">{% block content %}{% endblock content %}</div>
+</main>
 </body>
 </html>

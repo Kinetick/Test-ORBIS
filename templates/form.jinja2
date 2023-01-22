@@ -11,8 +11,8 @@
     <form action="{{ action_url }}" method="post" enctype="multipart/form-data" class="form_style" accept-charset="utf-8">
         {%- if  page_target != 'search'%}
             <div class="text_row">
-                <label for="f_name">Имя файла:</label>
-                <input id="f_name" class="text_row" name="name" placeholder="Пример: myfile" value="{{ form_data.name }}">
+                <label for="f_name" class="form_label">Имя файла:</label>
+                <input id="f_name" class="form_input" name="name" placeholder="Пример: myfile" value="{{ form_data.name }}">
             </div>  
         {% endif -%}
         {%- if page_target != 'search' and page_target != 'update' %}
@@ -20,10 +20,10 @@
         {% endif -%}
         <div class="text_row">
             <label for="f_path">Путь к файлу:</label>
-            <input id="f_path" class="text_row" name="path", placeholder="Пример: /my_dir" value="{{ form_data.path }}">
+            <input id="f_path" name="path", placeholder="Пример: /my_dir" value="{{ form_data.path }}">
         </div>
         {%- if  page_target == 'insert' or page_target == 'update' %}
-            <textarea name="comment" id="f_comm" rows="2" cols="100" name="comment" placeholder="Комментарий:">{{ form_data.comment }}</textarea>
+            <textarea name="comment" id="f_comm" rows="2" cols="100" name="comment" placeholder="Комментарий:" class="form_texarea">{{ form_data.comment }}</textarea>
         {% endif -%}
     
         {%- if page_target == 'insert'%}

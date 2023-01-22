@@ -1,5 +1,5 @@
 from aiohttp import BodyPartReader, MultipartReader
-from typing import Any, Coroutine, TypeVar, Dict, Union, Type
+from typing import Any, Coroutine, TypeVar, Dict, Union, Type, Tuple
 
 from app.routes.tools import FormHandler
 
@@ -14,6 +14,11 @@ class SearchForm:
         r = {'path': self.path}
         
         return r
+    
+    def get_spec_data(self, keys: Tuple[str]) -> Dict[str, str]:
+        data = self.get_data()
+        
+        return {key: data.get(key, None) for key in keys}
 
 
 class InfoForm(SearchForm):
@@ -37,7 +42,7 @@ class InfoForm(SearchForm):
 class UpdateForm(InfoForm):
     __slots__ = 'comment'
     
-    def __init__(self, path: str, name: str , comment: str, ext: str) -> None:
+    def __init__(self, path: str, name: str , comment: str, ext: str = '') -> None:
         
         super().__init__(path, name, ext)
         self.comment = comment

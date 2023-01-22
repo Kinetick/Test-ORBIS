@@ -9,8 +9,11 @@
         {{ m_form(f_action, target, f_data) }}
     {% endif %} 
     {% if result %}
+    <table>
+        <tbody>
         {% for item in result %}
             {{ result_item(item.value, item.del_url, item.upd_url, item.dwld_url) }}
-        {% endfor %}
+        {% endfor %}</tbody>
+    </table>        
     {% endif %}
 {% endblock content %}
