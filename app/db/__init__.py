@@ -103,10 +103,10 @@ class DBHandler:
     
         return res
     
-    async def execute(self, sql_query: Any, is_dml: bool = False) -> Coroutine[Any, Any, List[Result]]:
+    async def execute(self, sql_query: Any, is_dml: bool = False, prms: List[Dict[str, str]] = None) -> Coroutine[Any, Any, List[Result]]:
         async with self.get_session() as session:
-            if is_dml:
-                await session.execute(sql_query)
+            if is_dml:   
+                await session.execute(sql_query, prms)
                 await session.commit()
             
             else:
@@ -169,43 +169,58 @@ class DBHandler:
         
         return paths_fh_db, paths_db_fh
     
-    async def _files_obj_creator(self, save_dir_path: tls.T, paths_fh_db: Set[tls.T]) -> Coroutine[Any, Any, List[File]]:
+    def _ext_maker(self, path: tls.T, default: str = '') -> str:
+        return ''.join(path.suffixes).lstrip('./\\') if path.suffixes else f'{default}'
+    
+    async def _files_obj_creator(self, save_dir_path: tls.T, paths_db_fh: Set[tls.T]) -> Coroutine[Any, Any, List[File]]:
         files_objs = []
         
-        for path in paths_fh_db:
+        for path in paths_db_fh:
             file_data_dict = dict()
             file_data_dict['name'] = path.stem
-            file_data_dict['ext'] = ''.join(path.suffixes).lstrip('./\\') if path.suffixes else f'{int(time() * 1000)}'
+            file_data_dict['ext'] = self._ext_maker(path)
             file_data_dict['path'] = str(path.parent)
             file_data_dict['update'] = None
             file_data_dict['comment'] = 'У файла нет комментария.'
+            
+            try:    
+                file_stat = await aos.stat(save_dir_path.joinpath(path))
+            
+            except FileNotFoundError:
+                created = ''
+                sz = 0
+            else:
+                created = datetime.utcfromtimestamp(file_stat.st_ctime).isoformat()
+                sz = file_stat.st_size
                 
-            file_stat = await aos.stat(save_dir_path.joinpath(path))
-            file_data_dict['create'] = datetime.utcfromtimestamp(file_stat.st_ctime).isoformat()
-            file_data_dict['sz'] = file_stat.st_size
+            file_data_dict['create'] = created
+            file_data_dict['sz'] = sz
             
             files_objs.append(File(**file_data_dict))
             
         return files_objs  
     
-    async def _db_adder(self, save_dir_path: tls.T, paths_fh_db: Set[tls.T]) -> Coroutine[Any, Any, None]:
-        files = await self._files_obj_creator(save_dir_path, paths_fh_db)
+    async def _db_adder(self, save_dir_path: tls.T, paths_db_fh: Set[tls.T]) -> Coroutine[Any, Any, None]:
+        files = await self._files_obj_creator(save_dir_path, paths_db_fh)
         await self.insert(files)
-        print(files)
     
-    # Пока не реализован
-    async def _db_updater(self, save_dir_path: tls.T, paths_fh_db: Set[tls.T], paths_db_fh: Set[tls.T]) -> Coroutine[Any, Any, None]:
+    async def _db_cleaner(self, paths_fh_db: Set[tls.T]) -> Coroutine[Any, Any, None]:
+        params = [{"path": str(path.parent), "name": path.stem, "ext": self._ext_maker(path)} for path in paths_fh_db]
         
+        if params:
+            sql_query = sql.delete(File).where(
+                File.name == sql.bindparam('name'),
+                File.path == sql.bindparam('path'),
+                File.ext == sql.bindparam('ext')
+                )
         
-        pass
+            await self.execute(sql_query, True, params)
              
     async def db_normalizer(self, save_dir_path: tls.T, related_to: tls.T, db_obj: Type[File]) -> Coroutine[Any, Any, None]:
         files_holder_paths, db_files_paths = await asyncio.gather(
             self._path_extractor(save_dir_path, related_to, self._path_aggregator),
             self._path_extractor(save_dir_path, related_to, self._db_path_aggregator)
         )
-        
         paths_fh_db, paths_db_fh = self._difference_getter(files_holder_paths, db_files_paths)
-        await self._db_adder(save_dir_path, paths_db_fh)
         
-        # print(paths_fh_db, paths_db_fh)
+        await asyncio.gather(self._db_adder(save_dir_path, paths_db_fh), self._db_cleaner(paths_fh_db))
