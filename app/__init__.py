@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, Union
 
 from app.routes import routes_setup
-from app.db import Base, DBHandler
+from app.db import Base, DBHandler, File
 
 
 async def app_setup(app: Application, app_vars: Dict[str, Union[Path, int, str]]) -> Application:
@@ -22,6 +22,7 @@ async def app_setup(app: Application, app_vars: Dict[str, Union[Path, int, str]]
     db_hanler = DBHandler(app['DB_URL'])
     app['DB_HANDLER'] = db_hanler
     await db_hanler.create(Base)
+    await db_hanler.db_normalizer(app['SAVE_DIR'], app['SAVE_DIR'], File)
     
     return app
 
