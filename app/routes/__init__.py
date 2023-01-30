@@ -1,6 +1,7 @@
 import aiohttp.web as web
 from aiohttp.web import Application
 
+import app as m_app
 from app.routes import handlers
 
 
@@ -27,4 +28,4 @@ def routes_setup(app: Application) -> None:
         web.post('/update', update_handler.post, name='p_update')
     ])
     
-    app.router.add_static('/static', app['STATIC'], name='static')
+    app.router.add_static('/static', m_app.STATIC_DIR, name='static')

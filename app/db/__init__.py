@@ -8,7 +8,6 @@ from pathlib import Path
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from time import time
 from typing import Coroutine, Any, List, Dict, Set, TypeVar, Type, Callable, Tuple, Union
 
 
@@ -63,7 +62,7 @@ from app.routes.tools import FileHandler
 
 class DBHandler:
     def __init__(self, db_url: str, echo: bool=False, future: bool=True) -> None:
-        self.__engine = create_async_engine(db_url, echo=True, future=future)
+        self.__engine = create_async_engine(db_url, echo=echo, future=future)
         self.__session_maker = sessionmaker(self.__engine, expire_on_commit=False, class_=AsyncSession)
     
     async def create(self, Base: DeclarativeMeta) -> None:
@@ -131,10 +130,10 @@ class DBHandler:
 
 
     # Можно и в статик, т.к. пр-во имен экземпляра не нужно тут, но пусть остается как есть
-    async def _path_aggregator(self, entry_path: tls.T) -> Coroutine[Any, Any, List[tls.T]]:
+    async def _path_aggregate(self, entry_path: tls.T) -> Coroutine[Any, Any, List[tls.T]]:
         result = []
         entry_path_items = [Path(entry_path).joinpath(item) for item in await aos.listdir(entry_path)]
-        [result.extend(await self._path_aggregator(item)) if await aos.path.isdir(item) else result.append(item) for item in entry_path_items]
+        [result.extend(await self._path_aggregate(item)) if await aos.path.isdir(item) else result.append(item) for item in entry_path_items]
     
         return result
 
@@ -142,14 +141,14 @@ class DBHandler:
     def _path_relating(self, paths: List[tls.T], related_to_path: tls.T) -> Set[tls.T]:
         return {path.relative_to(related_to_path) for path in paths}
     
-    async def _db_path_aggregator(self, save_dir_path: tls.T) -> Coroutine[Any, Any, List[tls.T]]:
+    async def _db_path_aggregate(self, save_dir_path: tls.T) -> Coroutine[Any, Any, List[tls.T]]:
         sql_query = sql.select(File)
         paths = [FileHandler.path_constructor(save_dir_path, item.value.get('path', ''), item.value.get('name', ''), item.value.get('ext', ''))\
             for item in await self.execute(sql_query)]
 
         return paths
     
-    async def _path_extractor(
+    async def _path_extract(
         self, 
         entry_path: tls.T, 
         related_to_path: tls.T, 
@@ -162,23 +161,23 @@ class DBHandler:
     
         return r_paths
     
-    def _difference_getter(self, paths_fh: Set[tls.T], paths_bd: Set[tls.T]) -> Tuple[Set[tls.T], Set[tls.T]]:
+    def _difference_get(self, paths_fh: Set[tls.T], paths_bd: Set[tls.T]) -> Tuple[Set[tls.T], Set[tls.T]]:
         symmetric = paths_fh.symmetric_difference(paths_bd)
         paths_fh_db = symmetric - paths_fh
         paths_db_fh = symmetric - paths_bd
         
         return paths_fh_db, paths_db_fh
     
-    def _ext_maker(self, path: tls.T, default: str = '') -> str:
+    def _ext_make(self, path: tls.T, default: str = '') -> str:
         return ''.join(path.suffixes).lstrip('./\\') if path.suffixes else f'{default}'
     
-    async def _files_obj_creator(self, save_dir_path: tls.T, paths_db_fh: Set[tls.T]) -> Coroutine[Any, Any, List[File]]:
+    async def _files_obj_create(self, save_dir_path: tls.T, paths_db_fh: Set[tls.T]) -> Coroutine[Any, Any, List[File]]:
         files_objs = []
         
         for path in paths_db_fh:
             file_data_dict = dict()
             file_data_dict['name'] = path.stem
-            file_data_dict['ext'] = self._ext_maker(path)
+            file_data_dict['ext'] = self._ext_make(path)
             file_data_dict['path'] = str(path.parent)
             file_data_dict['update'] = None
             file_data_dict['comment'] = 'У файла нет комментария.'
@@ -200,12 +199,12 @@ class DBHandler:
             
         return files_objs  
     
-    async def _db_adder(self, save_dir_path: tls.T, paths_db_fh: Set[tls.T]) -> Coroutine[Any, Any, None]:
-        files = await self._files_obj_creator(save_dir_path, paths_db_fh)
+    async def _add(self, save_dir_path: tls.T, paths_db_fh: Set[tls.T]) -> Coroutine[Any, Any, None]:
+        files = await self._files_obj_create(save_dir_path, paths_db_fh)
         await self.insert(files)
     
-    async def _db_cleaner(self, paths_fh_db: Set[tls.T]) -> Coroutine[Any, Any, None]:
-        params = [{"path": str(path.parent), "name": path.stem, "ext": self._ext_maker(path)} for path in paths_fh_db]
+    async def _cleane(self, paths_fh_db: Set[tls.T]) -> Coroutine[Any, Any, None]:
+        params = [{"path": str(path.parent), "name": path.stem, "ext": self._ext_make(path)} for path in paths_fh_db]
         
         if params:
             sql_query = sql.delete(File).where(
@@ -216,11 +215,11 @@ class DBHandler:
         
             await self.execute(sql_query, True, params)
              
-    async def db_normalizer(self, save_dir_path: tls.T, related_to: tls.T, db_obj: Type[File]) -> Coroutine[Any, Any, None]:
+    async def normalize(self, save_dir_path: tls.T, related_to: tls.T, db_obj: Type[File]) -> Coroutine[Any, Any, None]:
         files_holder_paths, db_files_paths = await asyncio.gather(
-            self._path_extractor(save_dir_path, related_to, self._path_aggregator),
-            self._path_extractor(save_dir_path, related_to, self._db_path_aggregator)
+            self._path_extract(save_dir_path, related_to, self._path_aggregate),
+            self._path_extract(save_dir_path, related_to, self._db_path_aggregate)
         )
-        paths_fh_db, paths_db_fh = self._difference_getter(files_holder_paths, db_files_paths)
+        paths_fh_db, paths_db_fh = self._difference_get(files_holder_paths, db_files_paths)
         
-        await asyncio.gather(self._db_adder(save_dir_path, paths_db_fh), self._db_cleaner(paths_fh_db))
+        await asyncio.gather(self._add(save_dir_path, paths_db_fh), self._cleane(paths_fh_db))
