@@ -1,0 +1,27 @@
+# Пример настройки двух приложений на локально петле с портами 5000 и 5001
+# соответсвенно.
+
+# applications:
+#   app_1:
+#     app_vars:
+#       save_path: 'Абсолютный путь к файловому хранилищу'
+#     app_settings:
+#       host: ''
+#       port: 5000
+#     db_settings:
+#       db_type: "SQLite"
+#       db_path: 'Абсолютный путь к базе данных'
+#       db_name: 'Название базы данных'
+  
+#   app_2:
+#     app_vars:
+#       save_path: 'Абсолютный путь к файловому хранилищу'
+#     app_settings:
+#       host: ''
+#       port: 5001
+#     db_settings:
+#       db_type: "PostgreSQL"
+#       db_name: 'Название базы данных'
+#       db_host: '120.258.0.58'
+#       db_port: 4326
+

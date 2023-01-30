@@ -1,47 +1,22 @@
 import asyncio
-import aiohttp_jinja2
-import jinja2
-
-from aiohttp.web import Application, AppRunner, TCPSite
-from functools import partial
 from pathlib import Path
-from typing import Dict, Union
+from typing import Any, Coroutine
 
-from app.routes import routes_setup
-from app.db import Base, DBHandler, File
-
-
-async def app_setup(app: Application, app_vars: Dict[str, Union[Path, int, str]]) -> Application:
-
-    for key , value in app_vars.items():
-        app[key.upper()] = value
-        
-    routes_setup(app)
-    
-    aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(app['TEMPLATES']))
-    db_hanler = DBHandler(app['DB_URL'])
-    app['DB_HANDLER'] = db_hanler
-    await db_hanler.create(Base)
-    await db_hanler.db_normalizer(app['SAVE_DIR'], app['SAVE_DIR'], File)
-    
-    return app
+from app.configurator import AppConfigurator
+from app.db import Base
 
 
-async def app_starter(app_vars: Dict[str, Union[Path, str]]):
-    app = Application()
-    
-    app = await app_setup(app, app_vars)
-    
-    runner = AppRunner(app)
-    await runner.setup()
-    
-    site = TCPSite(runner, port=app['PORT'])
-    
-    try:
-        await site.start()
-    
-        while True:
-            await asyncio.sleep(app['AWAIT'])
-    
-    finally:
-        await app['DB_HANDLER'].release()
+PROJECT_DIR = Path(__file__).parent.parent
+
+# Компоненты приложения
+TEMPLATES_DIR = PROJECT_DIR.joinpath('templates')
+STATIC_DIR = PROJECT_DIR.joinpath('static')
+CONFIG_DIR = PROJECT_DIR.joinpath('config')
+
+
+async def app_starter() -> Coroutine[Any, Any, None]:
+    config_path = CONFIG_DIR.joinpath('app_config.yaml')
+    configurator = AppConfigurator(config_path, Base)
+    await configurator.configurate()
+    sites_tasks = configurator.sites_start_tasks_create()
+    await asyncio.gather(*sites_tasks)
