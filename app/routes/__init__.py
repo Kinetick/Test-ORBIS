@@ -13,6 +13,7 @@ def routes_setup(app: Application) -> None:
     delete_handler = handlers.DeleteHandler(app)
     insert_handler = handlers.InsertHandler(app)
     update_handler = handlers.UpdateHandler(app)
+    sync_handler = handlers.SyncHandler(app)
     
     app.add_routes([
         web.get('/search', search_handler.get, name='g_search'),
@@ -25,7 +26,8 @@ def routes_setup(app: Application) -> None:
         web.get('/insert', insert_handler.get, name='g_insert'),
         web.post('/insert', insert_handler.post, name='p_insert'),
         web.get('/update', update_handler.get, name='g_update'),
-        web.post('/update', update_handler.post, name='p_update')
+        web.post('/update', update_handler.post, name='p_update'),
+        web.get('/sync', sync_handler.get, name='sync')
     ])
     
     app.router.add_static('/static', m_app.STATIC_DIR, name='static')

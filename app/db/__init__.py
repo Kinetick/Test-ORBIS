@@ -215,7 +215,7 @@ class DBHandler:
         
             await self.execute(sql_query, True, params)
              
-    async def normalize(self, save_dir_path: tls.T, related_to: tls.T, db_obj: Type[File]) -> Coroutine[Any, Any, None]:
+    async def normalize(self, save_dir_path: tls.T, related_to: tls.T) -> Coroutine[Any, Any, None]:
         files_holder_paths, db_files_paths = await asyncio.gather(
             self._path_extract(save_dir_path, related_to, self._path_aggregate),
             self._path_extract(save_dir_path, related_to, self._db_path_aggregate)
