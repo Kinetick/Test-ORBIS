@@ -25,3 +25,16 @@
 #       db_host: '120.258.0.58'
 #       db_port: 4326
 
+
+ applications:
+  app_1:
+    app_vars:
+      save_path: '/app/files'
+    app_settings:
+      host: ''
+      port: 5000
+    db_settings:
+      db_type: "SQLite"
+      db_path: '/app/database'
+      db_name: 'app_1.sqlite'
+      
