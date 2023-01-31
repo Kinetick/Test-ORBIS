@@ -275,8 +275,14 @@ class UpdateHandler(BaseHandler):
         
         if request.query.get('comment') != form.comment:
             await db_handler.update(db.File, request, {'update': datetime.now().isoformat(), **form.get_spec_data(('comment',))})
+
+        raise self._redirect_maker('index')
+
+
+class SyncHandler(BaseHandler):
+    def __init__(self, app: Application) -> None:
+        super().__init__(app)
     
-        response = render_template('index.jinja2', request=request, context=context.get_context())
-        
-        return response
-            
+    async def get(self, request: Request) -> Coroutine[Any, Any, Any]:
+        await self._app['DB_HANDLER'].normalize(self._app['SAVE_DIR'], self._app['SAVE_DIR'])
+        raise self._redirect_maker('index')

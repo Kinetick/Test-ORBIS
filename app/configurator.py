@@ -154,5 +154,5 @@ class AppConfigurator:
         self.__templates_setup()
         await self.__sites_create()
         await asyncio.gather(*[asyncio.create_task(application['DB_HANDLER'].create(self.__base)) for application in self.__apps.values()])
-        await asyncio.gather(*[asyncio.create_task(application['DB_HANDLER'].normalize(application['SAVE_DIR'], application['SAVE_DIR'], File))\
+        await asyncio.gather(*[asyncio.create_task(application['DB_HANDLER'].normalize(application['SAVE_DIR'], application['SAVE_DIR']))\
             for application in self.__apps.values()])
